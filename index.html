@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartScribe AI | 실시간 손글씨 숫자 인식기</title>
+  <meta name="description" content="웹 캔버스에 마우스로 숫자를 쓰면 인공지능(AI)이 실시간으로 0부터 9까지의 숫자를 판별하고 확률을 시각화해 주는 웹 애플리케이션입니다.">
+  <meta name="keywords" content="손글씨인식, MNIST, 인공지능, 딥러닝, TensorFlow.js, 웹앱, 바이브코딩">
+  
+  <!-- Google Fonts: Outfit & Pretendard fallback -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-background-glow glow-1"></div>
+  <div class="app-background-glow glow-2"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-branding">
+        <div class="logo-badge">
+          <i class="fa-solid fa-pen-nib"></i>
+        </div>
+        <div class="branding-text">
+          <h1>SmartScribe <span class="gradient-text">AI</span></h1>
+          <p class="subtitle">실시간 손글씨 숫자 인식기 · SDU 바이브코딩 과제</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <div id="aiStatusBadge" class="status-badge loading">
+          <span class="status-indicator"></span>
+          <span id="aiStatusText">AI 모델 불러오는 중...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-grid">
+      <!-- Left: Drawing Canvas Studio -->
+      <section class="card drawing-studio" aria-labelledby="canvasTitle">
+        <div class="card-header">
+          <div class="card-title-group">
+            <h2 id="canvasTitle"><i class="fa-solid fa-paintbrush"></i> 스케치북</h2>
+            <span class="hint-pill">마우스로 0~9 중 하나를 그려보세요</span>
+          </div>
+          <div class="brush-controls">
+            <label for="brushSize" class="brush-label">
+              <i class="fa-solid fa-circle"></i>
+              <span id="brushSizeDisplay">18px</span>
+            </label>
+            <input type="range" id="brushSize" min="8" max="32" value="18" step="2" aria-label="브러시 굵기 조절">
+          </div>
+        </div>
+
+        <div class="canvas-wrapper">
+          <canvas id="drawCanvas" width="280" height="280"></canvas>
+          <div class="canvas-overlay-grid">
+            <div class="guide-crosshair horizontal"></div>
+            <div class="guide-crosshair vertical"></div>
+            <div class="guide-box"></div>
+          </div>
+          <div id="canvasEmptyHint" class="canvas-empty-hint">
+            <i class="fa-solid fa-arrow-pointer bounce-anim"></i>
+            <span>여기에 마우스로 숫자를 그려보세요</span>
+          </div>
+        </div>
+
+        <!-- Canvas Toolbar -->
+        <div class="canvas-toolbar">
+          <button id="btnUndo" class="btn btn-secondary" title="방금 그린 획 되돌리기">
+            <i class="fa-solid fa-rotate-left"></i> 되돌리기
+          </button>
+          <button id="btnClear" class="btn btn-danger" title="도화지 전체 지우기">
+            <i class="fa-solid fa-trash-can"></i> 전체 지우기
+          </button>
+        </div>
+
+        <!-- Preset Samples (Quick test for demo/presentation) -->
+        <div class="presets-section">
+          <span class="presets-label"><i class="fa-solid fa-wand-magic-sparkles"></i> 빠른 테스트 예시:</span>
+          <div class="preset-chips">
+            <button class="preset-btn" data-digit="0">0</button>
+            <button class="preset-btn" data-digit="1">1</button>
+            <button class="preset-btn" data-digit="2">2</button>
+            <button class="preset-btn" data-digit="3">3</button>
+            <button class="preset-btn" data-digit="4">4</button>
+            <button class="preset-btn" data-digit="5">5</button>
+            <button class="preset-btn" data-digit="6">6</button>
+            <button class="preset-btn" data-digit="7">7</button>
+            <button class="preset-btn" data-digit="8">8</button>
+            <button class="preset-btn" data-digit="9">9</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Real-time Prediction Dashboard -->
+      <section class="card result-dashboard" aria-labelledby="resultTitle">
+        <div class="card-header">
+          <div class="card-title-group">
+            <h2 id="resultTitle"><i class="fa-solid fa-chart-pie"></i> 실시간 판독 분석</h2>
+            <span class="live-tag"><span class="live-dot"></span> LIVE</span>
+          </div>
+          <div class="vision-preview" title="AI가 실제로 바라보는 28x28 전처리 시야">
+            <span class="vision-label">AI 시야 (28x28)</span>
+            <canvas id="previewCanvas" width="28" height="28"></canvas>
+          </div>
+        </div>
+
+        <!-- Hero Prediction Result -->
+        <div class="hero-prediction-card">
+          <div class="hero-label">가장 유력한 숫자</div>
+          <div class="hero-digit-display">
+            <span id="predictedDigit" class="digit-number">-</span>
+          </div>
+          <div class="hero-meta">
+            <div class="confidence-badge" id="confidenceBadge">
+              <i class="fa-solid fa-shield-halved"></i>
+              <span id="confidenceText">신뢰도 대기 중</span>
+            </div>
+            <div class="inference-time" id="inferenceTime">반응속도: - ms</div>
+          </div>
+        </div>
+
+        <!-- Probability Distribution (0~9) -->
+        <div class="probability-list-container">
+          <div class="probability-header">
+            <span>각 숫자별 확률 분포 (0 ~ 9)</span>
+            <span id="topRankSummary" class="top-rank-summary"></span>
+          </div>
+          <div class="probability-list" id="probabilityList">
+            <!-- Dynamically populated 0~9 bars -->
+          </div>
+        </div>
+
+        <!-- Explanation Footer for Course Assignment -->
+        <div class="card-footer-tip">
+          <i class="fa-solid fa-circle-info"></i>
+          <span><strong>알림:</strong> 캔버스 중심에 큼직하고 뚜렷하게 그릴수록 인공지능의 인식률이 더욱 정확해집니다.</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>서울디지털대학교(SDU) 바이브코딩 최주영 교수님 과제 프로젝트 · 클라이언트 기반 경량 딥러닝 신경망</p>
+    </footer>
+  </div>
+
+  <!-- TensorFlow.js Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <!-- Application Logic -->
+  <script src="app.js?v=2"></script>
+</body>
+</html>
